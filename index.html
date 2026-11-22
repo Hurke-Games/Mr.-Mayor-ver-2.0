@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MAYOR CHARLES // Street Exploration & City Builder</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Shared Fullscreen Canvas (Renders 2D Isometric City Map OR 2D Side-Scrolling Street Exploration) -->
+  <canvas id="game-canvas"></canvas>
+  <div class="scanlines"></div>
+
+  <!-- ========================================================================= -->
+  <!-- 1. SIDE-SCROLLING STREET EXPLORATION HUD (MATCHING REFERENCE IMAGES)      -->
+  <!-- ========================================================================= -->
+  <div id="street-hud-layer" class="hidden">
+    <!-- Top-Left Street Direction & Controls Hint -->
+    <div id="street-top-left-bar">
+      <div class="street-compass-pill">
+        <span id="street-heading-label">EASTBOUND AVE // SECTOR (22, 24)</span>
+      </div>
+      <div class="street-controls-hint">
+        <span><strong>[A / D]</strong> Walk Street</span>
+        <span><strong>[W / S / Click]</strong> Cross at Crosswalk</span>
+        <span><strong>[E]</strong> Enter Building</span>
+        <span><strong>[Q / R]</strong> Turn 90° Corner</span>
+      </div>
+    </div>
+
+    <!-- Top-Right Perfectly Top-Down Street Minimap -->
+    <div id="street-minimap-card">
+      <div class="street-minimap-header">
+        <span>TOP-DOWN CITY MAP</span>
+        <span id="street-minimap-side-tag">NORTH SIDE</span>
+      </div>
+      <canvas id="street-minimap-canvas" width="176" height="176" title="Top-down City Minimap — Glowing Blue Dot = Mayor"></canvas>
+    </div>
+
+    <!-- Top-Right Blue-and-White Holographic Money & Population Bar (From Reference Image) -->
+    <div id="street-top-right-hud">
+      <div class="street-stat-pill" title="Active Cash (Mayor Treasury or Business Man Personal Funds)">
+        <span class="street-stat-icon">💵</span>
+        <span id="street-hud-money">$12,450</span>
+      </div>
+      <div class="street-stat-pill">
+        <span id="street-stat-pop-icon" class="street-stat-icon">👥</span>
+        <span id="street-hud-pop">4,250</span>
+      </div>
+      <button id="btn-street-lighting" class="street-mini-btn" title="Toggle Deep Blue / Ice-Blue Daylight">☀ / ☾</button>
+      <button id="btn-street-home-hq" class="street-mini-btn hidden" title="Open Business Portfolio & Residence HQ">🏠 PORTFOLIO HQ</button>
+      <button id="btn-indoor-exit-street" class="street-mini-btn accent hidden" title="Step out of Mayor's Office onto the Street">🚶 EXIT TO STREET</button>
+      <button id="btn-street-enter-hall" class="street-mini-btn primary" title="Enter City Hall / Mayor's Office">🏛 MAYOR'S OFFICE</button>
+    </div>
+
+    <!-- Bottom-Left Coloring-Book Mayor Portrait & Status Card -->
+    <div id="street-mayor-card">
+      <div class="mayor-portrait-frame" title="Mayor Portrait">
+        <img id="street-mayor-face-img" src="sprites/Characters/Mr Mayor/Face.png" alt="Mayor Face" />
+      </div>
+      <div class="mayor-status-text">
+        <div id="street-mayor-name" class="mayor-name">Mayor Charles:</div>
+        <div id="street-mayor-status" class="mayor-activity">Inspecting the Town</div>
+        <label class="mayor-moonwalk-toggle" title="Invert walking animation so holding Right plays Left animation and vice versa">
+          <input type="checkbox" id="chk-moonwalk" />
+          <span>Moonwalk Mode</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Bottom-Right Holographic Build & Action Dock (Hammer, Road, Wrench from Reference Image) -->
+    <div id="street-tools-dock">
+      <button id="btn-street-hammer" class="street-tool-icon-btn" title="Quick-Build / Upgrade Current Street Lot">
+        <svg viewBox="0 0 32 32" width="26" height="26">
+          <path d="M18 6 L26 14 L22 18 L14 10 Z M6 24 L16 14 L18 16 L8 26 Z" fill="#7dd3fc" stroke="#ffffff" stroke-width="1.5"/>
+        </svg>
+      </button>
+      <button id="btn-street-road" class="street-tool-icon-btn" title="Rotate 90° onto Cross Street [Q]">
+        <svg viewBox="0 0 32 32" width="26" height="26">
+          <path d="M8 26 L13 6 L19 6 L24 26 Z" fill="none" stroke="#7dd3fc" stroke-width="2.2"/>
+          <line x1="16" y1="9" x2="16" y2="23" stroke="#ffffff" stroke-width="2" stroke-dasharray="3 3"/>
+        </svg>
+      </button>
+      <button id="btn-street-wrench" class="street-tool-icon-btn" title="Enter City Hall (Open 2D City Planning Map)">
+        <svg viewBox="0 0 32 32" width="26" height="26">
+          <path d="M22 6 A6 6 0 0 0 15 13 L7 21 L11 25 L19 17 A6 6 0 0 0 26 10 L22 13 L19 10 Z" fill="#7dd3fc" stroke="#ffffff" stroke-width="1.5"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Building Interior Inspection / Business Purchase & Upgrade Modal -->
+  <div id="street-interior-modal" class="modal-overlay hidden">
+    <div class="start-menu-box" style="width:min(540px, 94vw);">
+      <div id="interior-modal-sign" class="cyber-badge">BAKERY</div>
+      <h2 id="interior-modal-title" style="color:#fff;margin-bottom:4px;">Neighborhood Shop</h2>
+      <p id="interior-modal-coords" style="font-size:11px;color:#7dd3fc;margin-bottom:14px;">GRID SECTOR</p>
+      <div id="interior-modal-body" style="text-align:left;background:rgba(15,23,42,0.85);padding:12px;border:1px solid #38bdf8;margin-bottom:14px;"></div>
+      <div id="interior-modal-business-actions" class="hidden" style="margin-bottom:14px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="btn-interior-to-map" class="cyber-btn primary" style="flex:1;">OPEN CITY MAP</button>
+        <button id="btn-close-interior" class="cyber-btn" style="flex:1;">BACK TO STREET</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compact Business Man Property Purchase / Upgrade Pop-up (with Hover Effects Sub-Popup) -->
+  <div id="bm-property-popup" class="modal-overlay hidden">
+    <div class="bm-compact-popup-box">
+      <div id="bm-popup-badge" class="cyber-badge">COMMERCIAL PROPERTY • LEVEL 1</div>
+      <h3 id="bm-popup-title" class="bm-popup-title">NEIGHBORHOOD BAKERY</h3>
+      <div id="bm-popup-body" class="bm-popup-body"></div>
+
+      <!-- Secondary Little Pop-up that appears when hovering over Good or Corrupt option -->
+      <div id="bm-choice-hover-popup" class="bm-choice-hover-popup hidden"></div>
+
+      <button id="btn-close-bm-popup" class="cyber-btn small full-w" style="margin-top:8px;">✕ CLOSE POP-UP</button>
+    </div>
+  </div>
+
+  <!-- Business Man Home Residence HQ & Portfolio Modal -->
+  <div id="business-portfolio-modal" class="modal-overlay hidden">
+    <div class="start-menu-box" style="width:min(680px, 95vw);max-height:88vh;overflow-y:auto;">
+      <div class="cyber-badge">RESIDENCE HEADQUARTERS // PORTFOLIO & TELEMETRY</div>
+      <h2 id="portfolio-modal-title" style="color:#fff;margin-bottom:4px;">VANCE'S BUSINESS PORTFOLIO</h2>
+      <p id="portfolio-modal-subtitle" style="font-size:11px;color:#7dd3fc;margin-bottom:14px;">PRIVATE RESIDENCE HQ & ASSET LEDGER</p>
+      <div id="portfolio-modal-body" style="text-align:left;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="btn-portfolio-to-map" class="cyber-btn primary" style="flex:1;">🗺 VIEW PORTFOLIO MAP</button>
+        <button id="btn-close-portfolio" class="cyber-btn" style="flex:1;">🚶 STEP OUTSIDE TO STREET</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mayor's Office Left Wall Map Option Modal -->
+  <div id="indoor-wall-map-modal" class="modal-overlay hidden">
+    <div class="start-menu-box" style="width:min(480px, 94vw);">
+      <div class="cyber-badge">MAYOR'S OFFICE // STRATEGIC WALL MAP</div>
+      <h2 style="color:#fff;margin-bottom:4px;">MAP OF THE CITY</h2>
+      <p style="font-size:11px;color:#7dd3fc;margin-bottom:14px;">CITY HALL PLANNING & INFRASTRUCTURE TERMINAL</p>
+      <div id="indoor-wall-map-summary" style="text-align:left;background:rgba(15,23,42,0.88);padding:12px;border:1px solid #38bdf8;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="btn-wall-map-open-city-map" class="cyber-btn accent" style="flex:1.2;">🗺 GO TO CITY MAP</button>
+        <button id="btn-close-wall-map-modal" class="cyber-btn" style="flex:0.8;">STAY IN OFFICE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mayor's Office Right-Side Advisor: Election Details, Top 5 Happy/Unhappy & Campaign Spending Modal -->
+  <div id="election-details-modal" class="modal-overlay hidden">
+    <div class="start-menu-box election-modal-box">
+      <div id="election-modal-badge" class="cyber-badge">CHIEF CAMPAIGN ADVISOR // PUBLIC OPINION & RE-ELECTION BRIEFING</div>
+      <h2 id="election-modal-title" style="color:#fff;margin-bottom:4px;">ELECTION DETAILS & CITIZEN HAPPINESS</h2>
+      <p id="election-modal-subtitle" style="font-size:11px;color:#7dd3fc;margin-bottom:14px;">TOP 5 CITIZEN PRAISES • TOP 5 GRIEVANCES • MONTHLY CAMPAIGN SELECTIONS</p>
+      <div id="election-modal-body" style="text-align:left;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="btn-close-election-modal" class="cyber-btn primary" style="flex:1;">✓ CONFIRM & RETURN TO MAYOR'S OFFICE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2-Year Municipal Election Results & Role Transition Modal (Held Jan 1 of Even Years) -->
+  <div id="election-result-modal" class="modal-overlay hidden">
+    <div class="start-menu-box" style="width:min(600px, 95vw);">
+      <div id="election-result-badge" class="cyber-badge">MUNICIPAL ELECTION COMMISSION // OFFICIAL BALLOT RESULTS</div>
+      <h2 id="election-result-title" style="color:#fff;margin-bottom:6px;">MUNICIPAL ELECTION RESULTS</h2>
+      <p id="election-result-subtitle" style="font-size:11px;color:#7dd3fc;margin-bottom:14px;">JANUARY 1 OFFICIAL VOTE TABULATION</p>
+      <div id="election-result-body" style="text-align:left;margin-bottom:16px;"></div>
+      <div id="election-result-actions" class="menu-btn-stack"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. CITY HALL 2D ISOMETRIC PLANNING MAP / BUSINESS PORTFOLIO MAP HUD       -->
+  <!-- ========================================================================= -->
+  <div id="city-map-hud-layer">
+    <header id="top-hud">
+      <!-- Mayor Top HUD Group -->
+      <div id="mayor-top-hud-stats" class="hud-group">
+        <input id="hud-city-name" class="city-name-input" type="text" value="METROVALE" title="Click to rename your city" />
+        <div class="hud-stat">
+          <span class="hud-label">POPULATION</span>
+          <span id="hud-pop" class="hud-value">0</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">DATE</span>
+          <span id="hud-date" class="hud-value">2088.01.01</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">TREASURY & TREND</span>
+          <div>
+            <span id="hud-money" class="hud-value money">$5,000</span>
+            <span id="hud-trend" class="budget-trend pos">▲ +$0/mo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Business Man Portfolio Map Top HUD Group -->
+      <div id="bm-top-hud-stats" class="hud-group hidden">
+        <div class="hud-stat">
+          <span class="hud-label">EXECUTIVE</span>
+          <span id="bm-hud-name" class="hud-value" style="color:#fde047;">VANCE</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">CASH ON HAND</span>
+          <span id="bm-hud-money" class="hud-value money">$30,000</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">GROSS REVENUE</span>
+          <span id="bm-hud-total-inc" class="hud-value" style="color:#38bdf8;">+$0/mo</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">LOAN PAYMENTS</span>
+          <span id="bm-hud-loan-pmt" class="hud-value" style="color:#f87171;">-$0/mo</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">NET CASH FLOW</span>
+          <span id="bm-hud-net-flow" class="hud-value" style="color:#4ade80;">+$0/mo</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">NET WORTH</span>
+          <span id="bm-hud-networth" class="hud-value" style="color:#e879f9;">$30,000</span>
+        </div>
+      </div>
+
+      <div class="hud-group">
+        <!-- Prominent Button to Leave City Hall / Portfolio Map and Walk the Streets -->
+        <button id="btn-exit-city-hall" class="cyber-btn small accent" title="Return to street exploration!">
+          🚶 EXIT CITY HALL (WALK STREETS)
+        </button>
+
+        <div id="mayor-top-hud-power" class="hud-stat">
+          <span class="hud-label">POWER GRID</span>
+          <span id="hud-power" class="hud-value" style="font-size:13px;color:#facc15;">0 / 0 MW</span>
+        </div>
+        <div id="mayor-top-hud-water" class="hud-stat" title="Click to toggle Water View on City Map" style="cursor:pointer;">
+          <span class="hud-label">WATER SUPPLY</span>
+          <span id="hud-water" class="hud-value" style="font-size:13px;color:#38bdf8;">100% 💧</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">MORALE</span>
+          <span id="hud-morale" class="hud-value" style="font-size:14px;color:#e879f9;">85%</span>
+        </div>
+
+        <!-- Game Speed: Pause, 1x, 2x, 4x, 8x -->
+        <div class="speed-controls" title="Simulation Speed (Spacebar to Pause)">
+          <button class="speed-btn" data-speed="0">❚❚</button>
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="2">2x</button>
+          <button class="speed-btn" data-speed="4">4x</button>
+          <button class="speed-btn" data-speed="8">8x</button>
+        </div>
+
+        <button id="btn-hud-sound" class="cyber-btn small" title="Toggle Sound">🔊</button>
+        <button id="btn-hud-save" class="cyber-btn small primary">SAVE / LOAD</button>
+        <button id="btn-hud-menu" class="cyber-btn small">MENU</button>
+      </div>
+    </header>
+
+    <!-- OVERLAY SELECTOR BAR -->
+    <nav id="overlay-bar"></nav>
+
+    <!-- LEFT DATA & TAX PANEL -->
+    <aside id="left-panel">
+      <div id="mayor-rci-card" class="holo-card">
+        <div class="card-title">
+          <span>R-C-I DEMAND & TRENDS</span>
+          <span style="color:#38bdf8;">CITY HALL PLANNING</span>
+        </div>
+        <div class="rci-graph-row">
+          <div class="rci-meters" title="Residential (Green), Commercial (Blue), Industrial (Amber) Demand">
+            <div class="rci-col">
+              <div id="rci-res" class="rci-bar res" style="height:80%;"></div>
+              <span class="rci-label" style="color:#4ade80;">R</span>
+            </div>
+            <div class="rci-col">
+              <div id="rci-comm" class="rci-bar comm" style="height:65%;"></div>
+              <span class="rci-label" style="color:#38bdf8;">C</span>
+            </div>
+            <div class="rci-col">
+              <div id="rci-ind" class="rci-bar ind" style="height:70%;"></div>
+              <span class="rci-label" style="color:#fbbf24;">I</span>
+            </div>
+          </div>
+          <canvas id="mini-graph-canvas" width="135" height="64" title="Cyan: Population | Magenta: Morale"></canvas>
+        </div>
+      </div>
+
+      <div id="mayor-fiscal-card" class="holo-card">
+        <div class="card-title">
+          <span id="fiscal-card-title">TAX & SUBSIDY MATRIX</span>
+          <span id="tax-rate-val">9%</span>
+        </div>
+        <div class="tax-row">
+          <span>City Tax Rate</span>
+          <span style="color:#94a3b8;font-size:10px;">(Low = +Morale)</span>
+        </div>
+        <input id="tax-slider" type="range" min="1" max="20" value="9" />
+
+        <div class="tax-row" style="margin-top:6px;">
+          <span>Commercial Subsidy</span>
+          <strong id="comm-subsidy-val" style="color:#38bdf8;">0%</strong>
+        </div>
+        <input id="comm-subsidy-slider" type="range" min="0" max="50" value="0" title="Speeds Commercial growth & boosts output" />
+
+        <div class="tax-row" style="margin-top:6px;">
+          <span>Industrial Subsidy</span>
+          <strong id="ind-subsidy-val" style="color:#fbbf24;">0%</strong>
+        </div>
+        <input id="ind-subsidy-slider" type="range" min="0" max="50" value="0" title="Speeds Industrial growth & boosts output" />
+
+        <div class="budget-mini">
+          <span>Tax Rev: <strong id="stat-tax-income" style="color:#4ade80;">+$0</strong></span>
+          <span>Upkeep: <strong id="stat-upkeep" style="color:#f87171;">-$0</strong></span>
+        </div>
+      </div>
+
+      <!-- Business Man Portfolio Map Interface Card (shown in 2D Map when playing as Business Man) -->
+      <div id="business-map-summary-card" class="holo-card hidden">
+        <div class="card-title">
+          <span>💼 BUSINESS PORTFOLIO MAP</span>
+          <span id="bm-map-mayor-type" style="color:#4ade80;">GOOD MAYOR</span>
+        </div>
+        <div class="insp-row">
+          <span>Cash On Hand:</span>
+          <strong id="bm-map-cash" style="color:#4ade80;font-size:13px;">$30,000</strong>
+        </div>
+        <div class="insp-row">
+          <span>Commercial / Industrial:</span>
+          <span><strong id="bm-map-comm-income" style="color:#38bdf8;">+$0</strong> / <strong id="bm-map-ind-income" style="color:#fbbf24;">+$0</strong></span>
+        </div>
+        <div class="insp-row">
+          <span>Gross Monthly Revenue:</span>
+          <strong id="bm-map-income" style="color:#38bdf8;">+$0 / mo</strong>
+        </div>
+        <div class="insp-row">
+          <span>Monthly Loan Payments:</span>
+          <strong id="bm-map-loan-pmt" style="color:#f87171;">-$0 / mo</strong>
+        </div>
+        <div class="insp-row" style="border-top:1px solid rgba(56,189,248,0.25);padding-top:4px;margin-top:4px;">
+          <span>Net Monthly Cash Flow:</span>
+          <strong id="bm-map-net-flow" style="color:#4ade80;font-size:13px;">+$0 / mo</strong>
+        </div>
+        <div class="insp-row">
+          <span>Total Loan Debt / Credit:</span>
+          <span><strong id="bm-map-debt" style="color:#f87171;">$0</strong> / <strong id="bm-map-credit" style="color:#fde047;">$150K</strong></span>
+        </div>
+        <div class="insp-row">
+          <span>Total Owned Properties:</span>
+          <strong id="bm-map-owned">0 (0 Comm / 0 Ind)</strong>
+        </div>
+        <div class="insp-row">
+          <span>Mayor Subsidies:</span>
+          <span>Comm <strong id="bm-map-comm-sub" style="color:#38bdf8;">0%</strong> | Ind <strong id="bm-map-ind-sub" style="color:#fbbf24;">0%</strong></span>
+        </div>
+        <div style="margin:6px 0;padding:6px;background:rgba(15,23,42,0.85);border:1px solid rgba(250,204,21,0.35);border-radius:4px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10.5px;font-weight:700;color:#fde047;">
+            <input type="checkbox" id="chk-map-run-for-mayor" style="width:14px;height:14px;accent-color:#fde047;cursor:pointer;" />
+            <span id="lbl-map-run-for-mayor">🗳 Run for Mayor (Next Election: Jan 1, 2032)</span>
+          </label>
+        </div>
+        <div id="bm-map-owned-list" style="max-height:110px;overflow-y:auto;margin:6px 0;padding-top:4px;border-top:1px solid rgba(56,189,248,0.2);"></div>
+        <button id="btn-bm-open-portfolio-map" class="cyber-btn small primary" style="width:100%;margin-top:4px;">
+          🏠 OPEN RESIDENCE PORTFOLIO HQ
+        </button>
+      </div>
+
+      <div class="holo-card">
+        <div class="card-title">
+          <span>SECTOR TELEMETRY</span>
+          <span>INSPECT</span>
+        </div>
+        <div id="tile-inspector-content">
+          <div class="insp-title">Click any tile to inspect</div>
+          <div class="insp-row"><span>Click City Hall:</span> <strong>Exit to Street View</strong></div>
+          <div class="insp-row"><span>Right-Click / Shift+Drag:</span> <strong>Pan Camera</strong></div>
+          <div class="insp-row"><span>Tier-4 Combo:</span> <strong>8 L3 tiles (≥90% Morale)</strong></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT MINIMAP & ALERTS PANEL -->
+    <aside id="right-panel">
+      <div class="holo-card">
+        <div class="card-title">
+          <span>REGION MINIMAP</span>
+          <span>56x56</span>
+        </div>
+        <canvas id="minimap-canvas" width="184" height="165"></canvas>
+      </div>
+
+      <div class="holo-card">
+        <div class="card-title">
+          <span>CITY ALERTS & FEED</span>
+          <span>⚡</span>
+        </div>
+        <div id="alert-ticker">
+          <span class="alert-tag info">[2088.01]</span> Inside City Hall Planning Room. Click "EXIT CITY HALL" to walk your streets!
+        </div>
+      </div>
+    </aside>
+
+    <!-- SMALL HOVER SQUARE COORDINATE POPUP (x1,y1 bottom-left to x56,y56 top-right) -->
+    <div id="hover-square-popup" class="hover-square-popup hidden">(x1,y1)</div>
+
+    <!-- BOTTOM BUILD TOOLBAR -->
+    <footer id="bottom-dock">
+      <div id="tool-desc-banner">Select a category and structure to build. Click "🚶 EXIT CITY HALL" anytime to walk the streets as Mayor Charles!</div>
+      <div id="toolbar-categories"></div>
+      <div id="toolbar-items"></div>
+    </footer>
+  </div>
+
+  <!-- ==================== STYLIZED START MENU MODAL (WITH 4 ROLE TABS ON LEFT) ==================== -->
+  <div id="start-menu-overlay" class="modal-overlay">
+    <div class="start-menu-box start-menu-with-tabs">
+      <!-- Left Role Tabs Column -->
+      <div class="start-role-tabs">
+        <div class="start-tabs-header">SELECT ROLE</div>
+        <button class="role-tab-btn active" data-role-tab="mayor">
+          <span class="role-tab-icon">🏛</span>
+          <div class="role-tab-text">
+            <span class="role-tab-title">Play as Mayor</span>
+            <span class="role-tab-sub">City Planning & Walk</span>
+          </div>
+        </button>
+        <button class="role-tab-btn" data-role-tab="businessman">
+          <span class="role-tab-icon">💼</span>
+          <div class="role-tab-text">
+            <span class="role-tab-title">Play as Business Man</span>
+            <span class="role-tab-sub">Buy & Run Enterprises</span>
+          </div>
+        </button>
+        <button class="role-tab-btn" data-role-tab="police">
+          <span class="role-tab-icon">🚓</span>
+          <div class="role-tab-text">
+            <span class="role-tab-title">Play as Police Chief</span>
+            <span class="role-tab-sub">Coming Soon</span>
+          </div>
+        </button>
+        <button class="role-tab-btn" data-role-tab="journalist">
+          <span class="role-tab-icon">📰</span>
+          <div class="role-tab-text">
+            <span class="role-tab-title">Start as Journalist</span>
+            <span class="role-tab-sub">Coming Soon</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Right Role Content Area -->
+      <div class="start-role-content">
+        <!-- TAB 1: PLAY AS MAYOR (Default Selected) -->
+        <div id="role-panel-mayor" class="role-tab-panel">
+          <div class="cyber-badge">CITY HALL & STREET EXPLORATION SIMULATION</div>
+          <h1 id="start-menu-title" class="game-title">MAYOR CHARLES</h1>
+          <p class="game-subtitle">2D CITY PLANNING MAP + 2.5D SIDE-SCROLLING STREET EXPLORATION</p>
+
+          <div class="mayor-name-setup">
+            <label for="input-mayor-name" class="mayor-name-label">NAME YOUR MAYOR:</label>
+            <input id="input-mayor-name" class="mayor-name-input" type="text" value="Charles" maxlength="22" placeholder="Enter Mayor Name..." />
+          </div>
+
+          <div class="menu-btn-stack">
+            <button id="btn-start-street-showcase" class="cyber-btn accent">🚶 WALK THE STREETS OF METROVALE (SHOWCASE)</button>
+            <button id="btn-start-new" class="cyber-btn primary">▶ START NEW CITY ($5,000 STARTING CASH)</button>
+            <button id="btn-start-showcase" class="cyber-btn">🏛 OPEN CITY HALL MAP (SHOWCASE METROPOLIS)</button>
+          </div>
+        </div>
+
+        <!-- TAB 2: PLAY AS BUSINESS MAN -->
+        <div id="role-panel-businessman" class="role-tab-panel hidden">
+          <div class="cyber-badge" style="border-color:#fbbf24;color:#fde047;">PRIVATE ENTERPRISE & REAL ESTATE TYCOON</div>
+          <h1 id="start-businessman-title" class="game-title" style="color:#fde047;">EXECUTIVE VANCE</h1>
+          <p class="game-subtitle">BUY COMMERCIAL & INDUSTRIAL ZONES • BUILD AN HONEST OR CORRUPT EMPIRE WHILE AI MAYOR CHARLES RUNS CITY HALL</p>
+
+          <div class="mayor-name-setup">
+            <label for="input-businessman-name" class="mayor-name-label">NAME YOUR BUSINESS MAN:</label>
+            <input id="input-businessman-name" class="mayor-name-input" type="text" value="Vance" maxlength="22" placeholder="Enter Business Man Name..." />
+          </div>
+
+          <div class="mayor-name-setup" style="margin-top:-6px;">
+            <label for="select-ai-mayor-type" class="mayor-name-label">COMPUTER MAYOR ALIGNMENT:</label>
+            <select id="select-ai-mayor-type" class="mayor-name-input" style="width:210px;cursor:pointer;">
+              <option value="good">Honest / Reformer Mayor (Rewards Good)</option>
+              <option value="corrupt">Corrupt Mayor (Rewards Corrupt)</option>
+              <option value="random">Random Disposition</option>
+            </select>
+          </div>
+
+          <div class="menu-btn-stack">
+            <button id="btn-start-bm-showcase" class="cyber-btn accent">💼 START AT RESIDENCE IN METROVALE ($30,000 CASH)</button>
+            <button id="btn-start-bm-new" class="cyber-btn primary">🏗 START IN DEVELOPING CITY WITH AI MAYOR ($30,000 CASH)</button>
+          </div>
+        </div>
+
+        <!-- TAB 3: PLAY AS POLICE CHIEF (Coming Soon Placeholder) -->
+        <div id="role-panel-police" class="role-tab-panel hidden">
+          <div class="cyber-badge" style="border-color:#60a5fa;color:#93c5fd;">PRECINCT COMMAND // COMING SOON</div>
+          <h1 class="game-title">POLICE CHIEF</h1>
+          <p class="game-subtitle">PRECINCT PATROLS, CRIME INVESTIGATION & CORRUPTION CRACKDOWNS</p>
+          <div style="background:rgba(15,23,42,0.8);border:1px solid #38bdf8;padding:18px;margin:16px 0;font-size:13px;color:#bae6fd;line-height:1.6;">
+            <strong>Play as Police Chief</strong> is currently in development! Soon you will dispatch patrol cruisers, investigate corrupt syndicates, and keep order on the streets while the AI Mayor and Business Tycoons operate across Metrovale.
+          </div>
+        </div>
+
+        <!-- TAB 4: START AS JOURNALIST (Coming Soon Placeholder) -->
+        <div id="role-panel-journalist" class="role-tab-panel hidden">
+          <div class="cyber-badge" style="border-color:#c084fc;color:#e9d5ff;">METROVALE GAZETTE // COMING SOON</div>
+          <h1 class="game-title">INVESTIGATIVE JOURNALIST</h1>
+          <p class="game-subtitle">UNCOVER SCANDALS, INTERVIEW CITIZENS & PUBLISH FRONT-PAGE EXPOSÉS</p>
+          <div style="background:rgba(15,23,42,0.8);border:1px solid #c084fc;padding:18px;margin:16px 0;font-size:13px;color:#e9d5ff;line-height:1.6;">
+            <strong>Start as Journalist</strong> is currently in development! Soon you will roam the streets with a press badge, document factory pollution or municipal kickbacks, and sway public morale through the Metrovale Gazette.
+          </div>
+        </div>
+
+        <!-- Shared Utility Buttons (Load/Save, Sound, Scenarios) -->
+        <div class="menu-btn-stack" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(56,189,248,0.25);">
+          <button id="btn-open-load" class="cyber-btn">⛁ LOAD / SAVE GAME (3 MEMORY SLOTS)</button>
+          <button id="btn-sound-toggle" class="cyber-btn">SOUND SYNTH: ONLINE [ON]</button>
+          <button id="btn-scenarios" class="cyber-btn">❖ SCENARIOS [COMING SOON]</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 3-SLOT SAVE / LOAD MODAL ==================== -->
+  <div id="saveload-modal" class="modal-overlay hidden">
+    <div class="start-menu-box" style="width:min(620px, 94vw);">
+      <div class="cyber-badge">MEMORY BANK STORAGE</div>
+      <h2 id="saveload-title" style="margin-bottom:18px;color:#fff;letter-spacing:2px;">LOAD METROPOLIS MATRIX</h2>
+      <div id="save-slots-container"></div>
+      <button id="btn-close-saveload" class="cyber-btn" style="margin-top:10px;width:100%;">RETURN</button>
+    </div>
+  </div>
+
+  <!-- ==================== SCENARIOS MODAL ==================== -->
+  <div id="scenario-modal" class="modal-overlay hidden">
+    <div class="start-menu-box">
+      <div class="cyber-badge">SCENARIO DIRECTIVES</div>
+      <h2 style="margin-bottom:12px;color:#fff;letter-spacing:2px;">SCENARIOS MODULE</h2>
+      <p style="font-size:13px;color:#94a3b8;line-height:1.6;margin-bottom:20px;">
+        Custom Scenario Operations (Grid Blackout Recovery, Traffic Lockdown on I-95, Smog Crisis, and Grand Condo Race) are reserved for the upcoming Scenario Expansion!
+      </p>
+      <button id="btn-close-scenario" class="cyber-btn primary" style="width:100%;">ACKNOWLEDGE & RETURN</button>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/street_view.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
